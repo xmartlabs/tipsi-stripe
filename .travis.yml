@@ -6,7 +6,7 @@ matrix:
     - os: linux
       language: android
       jdk: oraclejdk8
-      sudo: required
+      sudo: false
       android:
         components:
           - platform-tools
