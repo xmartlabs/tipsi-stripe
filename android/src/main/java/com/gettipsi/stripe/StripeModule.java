@@ -36,7 +36,6 @@ import com.google.android.gms.wallet.Wallet;
 import com.google.android.gms.wallet.WalletConstants;
 import com.stripe.android.Stripe;
 import com.stripe.android.TokenCallback;
-import com.stripe.android.exception.AuthenticationException;
 import com.stripe.android.model.BankAccount;
 import com.stripe.android.model.Card;
 import com.stripe.android.model.Token;
@@ -125,11 +124,7 @@ public class StripeModule extends ReactContextBaseJavaModule {
   @ReactMethod
   public void init(ReadableMap options) {
     publicKey = options.getString("publishableKey");
-    try {
-      stripe = new Stripe(publicKey);
-    } catch (AuthenticationException e) {
-      Log.e(TAG, "init: ", e);
-    }
+    stripe = new Stripe(getReactApplicationContext(), publicKey); //publicKey
   }
 
   @ReactMethod
@@ -294,7 +289,7 @@ public class StripeModule extends ReactContextBaseJavaModule {
         .setPaymentMethodTokenizationType(PaymentMethodTokenizationType.PAYMENT_GATEWAY)
         .addParameter("gateway", "stripe")
         .addParameter("stripe:publishableKey", publicKey)
-        .addParameter("stripe:version", StripeApiHandler.VERSION)
+        .addParameter("stripe:version", com.stripe.android.BuildConfig.VERSION_NAME)
         .build())
       // You want the shipping address:
       .setShippingAddressRequired(true)
@@ -397,27 +392,25 @@ public class StripeModule extends ReactContextBaseJavaModule {
   }
 
   private Card createCard(final ReadableMap cardData) {
-    return new Card(
-      // required fields
+    Card.Builder builder = new Card.Builder(
       cardData.getString("number"),
       cardData.getInt("expMonth"),
       cardData.getInt("expYear"),
-      // additional fields
-      exist(cardData, "cvc"),
-      exist(cardData, "name"),
-      exist(cardData, "addressLine1"),
-      exist(cardData, "addressLine2"),
-      exist(cardData, "addressCity"),
-      exist(cardData, "addressState"),
-      exist(cardData, "addressZip"),
-      exist(cardData, "addressCountry"),
-      exist(cardData, "brand"),
-      exist(cardData, "last4"),
-      exist(cardData, "fingerprint"),
-      exist(cardData, "funding"),
-      exist(cardData, "country"),
-      exist(cardData, "currency")
-    );
+      exist(cardData, "cvc"));
+
+    return builder.name(exist(cardData, "name"))
+      .addressLine1(exist(cardData, "addressLine1"))
+      .addressLine2(exist(cardData, "addressLine2"))
+      .addressCity(exist(cardData, "addressCity"))
+      .addressState(exist(cardData, "addressState"))
+      .addressState(exist(cardData, "addressZip"))
+      .addressCountry(exist(cardData, "addressCountry"))
+      .brand(exist(cardData, "brand"))
+      .last4(exist(cardData, "last4"))
+      .fingerprint(exist(cardData, "fingerprint"))
+      .funding(exist(cardData, "funding"))
+      .country(exist(cardData, "country"))
+      .currency(      exist(cardData, "currency")).build();
   }
 
   private WritableMap convertTokenToWritableMap(Token token) {
@@ -443,7 +436,7 @@ public class StripeModule extends ReactContextBaseJavaModule {
   private WritableMap convertCardToWritableMap(final Card card) {
     WritableMap result = Arguments.createMap();
 
-    if(card == null) return result;
+    if (card == null) return result;
 
     result.putString("number", card.getNumber());
     result.putString("cvc", card.getCVC() );
