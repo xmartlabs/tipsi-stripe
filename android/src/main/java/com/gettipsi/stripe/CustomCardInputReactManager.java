@@ -1,6 +1,6 @@
 package com.gettipsi.stripe;
 
-import android.icu.text.SimpleDateFormat;
+import java.text.SimpleDateFormat;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
@@ -8,16 +8,17 @@ import android.util.Log;
 import android.util.Xml;
 import android.widget.EditText;
 
-//import com.devmarvel.creditcardentry.library.CreditCardForm;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.annotations.ReactProp;
+import com.stripe.android.model.Card;
 import com.stripe.android.view.CardInputWidget;
-
 import org.xmlpull.v1.XmlPullParser;
+import java.text.ParseException;
+import java.util.Date;
 
 /**
  * Created by dmitriy on 11/15/16
@@ -25,7 +26,7 @@ import org.xmlpull.v1.XmlPullParser;
 
 public class CustomCardInputReactManager extends SimpleViewManager<CardInputWidget> {
 
-  public static final String REACT_CLASS = "CreditCardForm";
+  public static final String REACT_CLASS = "CardInputWidget";
   private static final String TAG = CustomCardInputReactManager.class.getSimpleName();
   private static final String NUMBER = "number";
   private static final String EXP_MONTH = "expMonth";
@@ -34,11 +35,6 @@ public class CustomCardInputReactManager extends SimpleViewManager<CardInputWidg
 
   private ThemedReactContext reactContext;
   private WritableMap currentParams;
-
-  private String currentNumber;
-  private int currentMonth;
-  private int currentYear;
-  private String currentCCV;
 
   @Override
   public String getName() {
@@ -57,7 +53,33 @@ public class CustomCardInputReactManager extends SimpleViewManager<CardInputWidg
 
     AttributeSet attr = Xml.asAttributeSet(parser);
     final CardInputWidget creditCardForm = new CardInputWidget(reactContext, attr);
-    setListeners(creditCardForm); // FIXME: 30.05.17 fix listeners
+    creditCardForm.setCardInputListener(new CardInputWidget.CardInputListener() {
+      @Override
+      public void onFocusChange(String focusField) {
+        Log.d(TAG, "### onFocusChange: " + focusField);
+        if (creditCardForm.getCard() != null){
+          Log.d(TAG, "### onFocusChange: card: ");
+        }
+      }
+
+      @Override
+      public void onCardComplete() {
+        postEvent(creditCardForm);
+        Log.d(TAG, "### onCardComplete");
+      }
+
+      @Override
+      public void onExpirationComplete() {
+        postEvent(creditCardForm);
+        Log.d(TAG, "### onExpirationComplete");
+      }
+
+      @Override
+      public void onCvcComplete() {
+        postEvent(creditCardForm);
+        Log.d(TAG, "### onCvcComplete");
+      }
+    });
     this.reactContext = reactContext;
     return creditCardForm;
   }
@@ -80,10 +102,8 @@ public class CustomCardInputReactManager extends SimpleViewManager<CardInputWidg
 
   @ReactProp(name = "expDate")
   public void setExpDate(CardInputWidget view, String expDate) {
-//   Integer month = Integer.parseInt(expDate.)
-//    sdf.get
-//    view.setExpiryDate(expDate, true); // FIXME: 30.05.17
-    Log.e("### setExpDate:", expDate);
+    Date date = convertDate(expDate);
+    view.setExpiryDate(date.getMonth(), date.getYear());
   }
 
   @ReactProp(name = "securityCode")
@@ -91,101 +111,31 @@ public class CustomCardInputReactManager extends SimpleViewManager<CardInputWidg
     view.setCvcCode(securityCode);
   }
 
-  @ReactProp(name = "numberPlaceholder")
-  public void setCreditCardTextHint(CardInputWidget view, String creditCardTextHint) {
-//    view.set(creditCardTextHint); // FIXME: 30.05.17
+  private Date convertDate(String dateString){
+    SimpleDateFormat dateFormat = new SimpleDateFormat("MMyy");
+    Date convertedDate = new Date();
+    try {
+      convertedDate = dateFormat.parse(dateString);
+    } catch (ParseException e) {
+      e.printStackTrace();
+    }
+    return convertedDate;
   }
 
-  @ReactProp(name = "expirationPlaceholder")
-  public void setExpDateTextHint(CardInputWidget view, String expDateTextHint) {
-//    view.setExpDateTextHint(expDateTextHint); // FIXME: 30.05.17
-  }
+  private void postEvent(CardInputWidget cardView){
+    if (cardView == null || cardView.getCard() == null) {
+      Log.d(TAG, "### Error, getCard == null"); // FIXME: 01.06.17 don`t forget to remove logs
+      return;
+    }
 
-  @ReactProp(name = "cvcPlaceholder")
-  public void setSecurityCodeTextHint(CardInputWidget view, String securityCodeTextHint) {
-//    view.setSecurityCodeTextHint(securityCodeTextHint); // FIXME: 30.05.17
-  }
-
-  private void setListeners(final CardInputWidget view){
-
-    final EditText ccNumberEdit = (EditText) view.findViewById(R.id.cc_card);
-    final EditText ccExpEdit = (EditText) view.findViewById(R.id.cc_exp);
-    final EditText ccCcvEdit = (EditText) view.findViewById(R.id.cc_ccv);
-
-    ccNumberEdit.addTextChangedListener(new TextWatcher() {
-      @Override
-      public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-      }
-
-      @Override
-      public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-        Log.d(TAG, "onTextChanged: cardNumber = "+charSequence);
-        currentNumber = charSequence.toString().replaceAll(" ", "");
-        postEvent(view);
-      }
-
-      @Override
-      public void afterTextChanged(Editable editable) {
-      }
-    });
-
-    ccExpEdit.addTextChangedListener(new TextWatcher() {
-      @Override
-      public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-      }
-
-      @Override
-      public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-        Log.d(TAG, "onTextChanged: EXP_YEAR = "+charSequence);
-        try {
-          currentMonth = view.getCreditCard().getExpMonth();
-        }catch (Exception e){
-          if(charSequence.length() == 0)
-            currentMonth = 0;
-        }
-        try {
-          currentYear = view.getCreditCard().getExpYear();
-        }catch (Exception e){
-          currentYear = 0;
-        }
-        postEvent(view);
-      }
-
-      @Override
-      public void afterTextChanged(Editable editable) {
-      }
-    });
-
-    ccCcvEdit.addTextChangedListener(new TextWatcher() {
-      @Override
-      public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-      }
-
-      @Override
-      public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-        Log.d(TAG, "onTextChanged: CCV = "+charSequence);
-        currentCCV = charSequence.toString();
-        postEvent(view);
-      }
-
-      @Override
-      public void afterTextChanged(Editable editable) {
-      }
-    });
-  }
-
-  private void postEvent(CardInputWidget view){
+    Card card = cardView.getCard();
     currentParams = Arguments.createMap();
-    currentParams.putString(NUMBER, currentNumber);
-    currentParams.putInt(EXP_MONTH, currentMonth);
-    currentParams.putInt(EXP_YEAR, currentYear);
-    currentParams.putString(CCV, currentCCV);
-//    reactContext.getNativeModule(UIManagerModule.class) // FIXME: 30.05.17
-//      .getEventDispatcher().dispatchEvent(
-//      new CreditCardFormOnChangeEvent(view.getId(), currentParams, view.isCreditCardValid()));
-  }
-
-  private void updateView(CardInputWidget view){
-
+    currentParams.putString(NUMBER, card.getNumber());
+    currentParams.putInt(EXP_MONTH, card.getExpMonth());
+    currentParams.putInt(EXP_YEAR, card.getExpYear());
+    currentParams.putString(CCV, card.getCVC());
+    reactContext.getNativeModule(UIManagerModule.class)
+      .getEventDispatcher().dispatchEvent(
+      new CreditCardFormOnChangeEvent(cardView.getId(), currentParams, cardView.getCard().validateCard()));
   }
 }
