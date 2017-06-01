@@ -6,42 +6,34 @@ import android.app.DialogFragment;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
-import com.devmarvel.creditcardentry.fields.SecurityCodeText;
-import com.devmarvel.creditcardentry.library.CreditCard;
-import com.devmarvel.creditcardentry.library.CreditCardForm;
-import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.WritableMap;
 import com.gettipsi.stripe.R;
 import com.gettipsi.stripe.util.CardFlipAnimator;
-import com.gettipsi.stripe.util.Utils;
+import com.gettipsi.stripe.util.CardUtils;
 import com.stripe.android.Stripe;
 import com.stripe.android.TokenCallback;
 import com.stripe.android.model.Card;
 import com.stripe.android.model.Token;
-
+import com.stripe.android.view.CardInputWidget;
 
 /**
  * Created by dmitriy on 11/13/16
  */
-
 public class AddCardDialogFragment extends DialogFragment {
 
   private static final String KEY = "KEY";
   private static final String TAG = AddCardDialogFragment.class.getSimpleName();
-  private static final String CCV_INPUT_CLASS_NAME = SecurityCodeText.class.getSimpleName();
   private String PUBLISHABLE_KEY;
 
   private ProgressBar progressBar;
-  private CreditCardForm from;
+  private CardInputWidget form;
   private ImageView imageFlipedCard;
   private ImageView imageFlipedCardBack;
 
@@ -113,43 +105,35 @@ public class AddCardDialogFragment extends DialogFragment {
 
   private void bindViews(final View view) {
     progressBar = (ProgressBar) view.findViewById(R.id.buttonProgress);
-    from = (CreditCardForm) view.findViewById(R.id.credit_card_form);
+    form = (CardInputWidget) view.findViewById(R.id.card_input_widget);
     imageFlipedCard = (ImageView) view.findViewById(R.id.imageFlippedCard);
     imageFlipedCardBack = (ImageView) view.findViewById(R.id.imageFlippedCardBack);
   }
 
 
   private void init() {
-    from.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+    form.setCardInputListener(new CardInputWidget.CardInputListener() {
       @Override
-      public void onFocusChange(final View view, boolean b) {
-        if (CCV_INPUT_CLASS_NAME.equals(view.getClass().getSimpleName())) {
-          if (b) {
-            cardFlipAnimator.showBack();
-            if (view.getTag() == null) {
-              view.setTag("TAG");
-              ((SecurityCodeText) view).addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                  //unused
-                }
-
-                @Override
-                public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                  doneButton.setEnabled(charSequence.length() == 3);
-                }
-
-                @Override
-                public void afterTextChanged(Editable editable) {
-                  //unused
-                }
-              });
-            }
-          } else {
-            cardFlipAnimator.showFront();
-          }
+      public void onFocusChange(String focusField) {
+        if(focusField.equals(CardInputWidget.FOCUS_CVC)){
+          cardFlipAnimator.showBack();
+        }else {
+          cardFlipAnimator.showFront();
         }
+      }
 
+      @Override
+      public void onCardComplete() {
+      }
+
+      @Override
+      public void onExpirationComplete() {
+      }
+
+      @Override
+      public void onCvcComplete() {
+        cardFlipAnimator.showFront();
+        doneButton.setEnabled(true);
       }
     });
 
@@ -160,42 +144,16 @@ public class AddCardDialogFragment extends DialogFragment {
   public void onSaveCLick() {
     doneButton.setEnabled(false);
     progressBar.setVisibility(View.VISIBLE);
-    final CreditCard fromCard = from.getCreditCard();
-    final Card card = new Card(
-      fromCard.getCardNumber(),
-      fromCard.getExpMonth(),
-      fromCard.getExpYear(),
-      fromCard.getSecurityCode());
-
-    String errorMessage = Utils.validateCard(card);
-    if (errorMessage == null) {
-      new Stripe().createToken(
+    final Card card = form.getCard(); // getCard returns null if some input invalid
+    String errorMessage = CardUtils.validateCard(card); // additional validation for errorMessage
+    if (card != null && errorMessage == null) {
+      new Stripe(this.getActivity()).createToken(
         card,
         PUBLISHABLE_KEY,
         new TokenCallback() {
           public void onSuccess(Token token) {
-            final WritableMap newToken = Arguments.createMap();
-            newToken.putString("tokenId", token.getId());
-            newToken.putBoolean("livemode", token.getLivemode());
-            newToken.putDouble("created", token.getCreated().getTime());
-            newToken.putBoolean("user", token.getUsed());
-            final WritableMap cardMap = Arguments.createMap();
-            final Card card = token.getCard();
-            cardMap.putString("cardId", card.getFingerprint());
-            cardMap.putString("brand", card.getBrand());
-            cardMap.putString("last4", card.getLast4());
-            cardMap.putInt("expMonth", card.getExpMonth());
-            cardMap.putInt("expYear", card.getExpYear());
-            cardMap.putString("country", card.getCountry());
-            cardMap.putString("currency", card.getCurrency());
-            cardMap.putString("name", card.getName());
-            cardMap.putString("addressLine1", card.getAddressLine1());
-            cardMap.putString("addressLine2", card.getAddressLine2());
-            cardMap.putString("addressCity", card.getAddressCity());
-            cardMap.putString("addressState", card.getAddressState());
-            cardMap.putString("addressCountry", card.getAddressCountry());
-            cardMap.putString("addressZip", card.getAddressZip());
-            newToken.putMap("card", cardMap);
+            final WritableMap newToken = CardUtils.createMapFromToken(token);
+            newToken.putMap("card", CardUtils.createMapFromCard(token.getCard()));
             if (promise != null) {
               promise.resolve(newToken);
               promise = null;

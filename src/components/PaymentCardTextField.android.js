@@ -132,7 +132,6 @@ const styles = StyleSheet.create({
   },
 })
 
-// CardInputWidget
 const NativePaymentCardTextField = requireNativeComponent('CardInputWidget', PaymentCardTextField, {
   nativeOnly: {
     borderColor: true,
