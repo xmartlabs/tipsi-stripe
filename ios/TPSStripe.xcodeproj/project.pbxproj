@@ -11,7 +11,7 @@
 		3A228EB21DC52E54007BB9D0 /* PassKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A228EB11DC52E54007BB9D0 /* PassKit.framework */; };
 		3A4EF3251DC8F90100A7C0BD /* TPSCardFieldManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A4EF3241DC8F90100A7C0BD /* TPSCardFieldManager.m */; };
 		3A4EF3281DC8FD4600A7C0BD /* TPSCardField.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A4EF3271DC8FD4600A7C0BD /* TPSCardField.m */; };
-		3C0CB3831E6D765D00CF5D16 /* Stripe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C0CB3821E6D765D00CF5D16 /* Stripe.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
+		3C0CB3831E6D765D00CF5D16 /* Stripe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C0CB3821E6D765D00CF5D16 /* Stripe.framework */; settings = {ATTRIBUTES = (Required, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -100,6 +100,7 @@
 				3A3A7F161DC27B520030F9DC /* Sources */,
 				3A3A7F171DC27B520030F9DC /* Frameworks */,
 				3A3A7F181DC27B520030F9DC /* CopyFiles */,
+				6625C63F1EFE63D0008F72B7 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -141,6 +142,22 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		6625C63F1EFE63D0008F72B7 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bash \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Stripe.framework/integrate-dynamic-framework.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		3A3A7F161DC27B520030F9DC /* Sources */ = {
