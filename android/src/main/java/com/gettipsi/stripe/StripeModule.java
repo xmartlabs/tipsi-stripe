@@ -64,7 +64,7 @@ public class StripeModule extends ReactContextBaseJavaModule {
   private static final String LINE_ITEMS = "line_items";
   private static final String QUANTITY = "quantity";
   private static final String DESCRIPTION = "description";
-
+  private static final String IS_SHIPPING_MANDATORY = "is_shipping_mandatory";
 
   private Promise payPromise;
 
@@ -281,11 +281,16 @@ public class StripeModule extends ReactContextBaseJavaModule {
     androidPayParams = map;
     final String estimatedTotalPrice = map.getString(TOTAL_PRICE);
     final String currencyCode = map.getString(CURRENCY_CODE);
-    final MaskedWalletRequest maskedWalletRequest = createWalletRequest(estimatedTotalPrice, currencyCode);
+    final boolean isShippingAddressMandatory = existBoolean(map, IS_SHIPPING_MANDATORY, true); // shipping address are required by default
+    final MaskedWalletRequest maskedWalletRequest = createWalletRequest(estimatedTotalPrice, currencyCode, isShippingAddressMandatory);
     Wallet.Payments.loadMaskedWallet(googleApiClient, maskedWalletRequest, LOAD_MASKED_WALLET_REQUEST_CODE);
   }
 
-  private MaskedWalletRequest createWalletRequest(final String estimatedTotalPrice, final String currencyCode) {
+  private MaskedWalletRequest createWalletRequest(
+    final String estimatedTotalPrice,
+    final String currencyCode,
+    final boolean isMandatory
+  ) {
 
     final MaskedWalletRequest maskedWalletRequest = MaskedWalletRequest.newBuilder()
 
@@ -503,6 +508,15 @@ public class StripeModule extends ReactContextBaseJavaModule {
       return map.getString(key);
     } else {
       // If map don't have some key - we must pass to constructor default value.
+      return def;
+    }
+  }
+
+  private Boolean existBoolean(final ReadableMap map, final String key, final Boolean def) {
+    if (map.hasKey(key)) {
+      return map.getBoolean(key);
+    } else {
+      // If map don't have some key - we must pass to constructor default boolean value.
       return def;
     }
   }

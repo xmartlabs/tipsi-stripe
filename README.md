@@ -364,6 +364,7 @@ An object with the following keys:
 
 * `total_price` _String_ - Price of the item.
 * `currency_code` _String_ - Three-letter ISO currency code representing the currency paid out to the bank account.
+* `is_shipping_mandatory` _Boolean_ - (true by default) Parameter that makes shipping address mandatory (or not) while AndroidPayConfiguration initialisation.  
 
 #### Example
 
