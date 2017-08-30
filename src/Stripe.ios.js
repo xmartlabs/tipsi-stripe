@@ -67,6 +67,20 @@ class Stripe {
     )
     return TPSStripeManager.createTokenWithBankAccount(params)
   }
+  createSourceWithBitcoin = (params = {}) => {
+    checkArgs(
+      types.createSourceWithBitcoinPropTypes,
+      params, 'params', 'Stripe.createSourceWithBitcoin'
+    )
+    return TPSStripeManager.createSourceWithBitcoin(params)
+  }
+  createSourceWithAliPay = (params = {}) => {
+    checkArgs(
+      types.createSourceWithAliPayPropTypes,
+      params, 'params', 'Stripe.createSourceWithAliPay'
+    )
+    return TPSStripeManager.createSourceWithAliPay(params)
+  }
 }
 
 export default new Stripe()

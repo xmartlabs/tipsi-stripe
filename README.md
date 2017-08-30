@@ -392,6 +392,139 @@ const token = await stripe.paymentRequestWithAndroidPay(options)
 // api.sendTokenToBackend(token)
 ```
 
+### Other sources (https://stripe.com/docs/sources)
+
+Currently only `Bitcoin` and `Alipay` are supported by `Tipsy-Stripe`.
+
+#### Bitcoin
+
+#### `createSourceWithBitcoin(options) -> Promise`
+
+Create a source to pay with `Bitcoin`. Returns a [`source`](https://stripe.com/docs/api#source_object) object.
+
+##### `options`
+An object with the following keys:
+
+* `amount` _Integer_ - A positive integer in the smallest currency unit representing the amount to charge the customer (e.g., 1099 for a $10.99 payment).
+* `email` _String_ - The full email address of the customer.
+
+#### Example
+
+```js
+const options = {
+  amount: '8000',
+  email: 'youremail@test.com',
+}
+
+const source = await stripe.createSourceWithBitcoin(options)
+
+// Client specific code
+// Send source to backend and wait for it to be chargeable to create charge
+// api.sendSourceToBackend(source)
+```
+
+#### AliPay
+
+#### `createSourceWithAliPay(options) -> Promise`
+
+Create a source to pay with `AliPay`. After the customer returns to the app, returns an object with the following data:
+* `sourceId` _String_ - A string representing the original ID of the `Source` object.
+* `clientSecret` _String_ - Used to confirm that the returning customer is the same one who triggered the creation of the source (source IDs are not considered secret)
+
+##### `options`
+An object with the following keys:
+
+* `amount` _Integer_ - A positive integer in the smallest currency unit representing the amount to charge the customer (e.g., 1099 for a $10.99 payment).
+* `currency` _String_ - The currency of the payment. Can be aud, cad, eur, gbp, hkd, jpy, nzd, sgd, or usd, defaults to usd.
+* `returnURL` _String_ - The URL the customer should be redirected to after the authorization process.
+
+#### Example
+
+```js
+const options = {
+  amount: '8000',
+  currency: 'usd',
+  returnURL: 'yourexampleapp://',
+}
+
+const result = await stripe.createSourceWithAliPay(options)
+
+// Client specific code
+// Send sourceId to backend to create charge
+// api.sendSourceToBackend(result.sourceId)
+```
+
+#### Redirecting your customer to authorize a source
+
+For sources that require redirecting your customer to authorize the payment, you need to specify a return URL when you create the source. This allows your customer to be redirected back to your app after they authorize the payment.
+
+#### iOS
+For this return URL, you can either use a custom URL scheme or a universal link supported by your app. For more information on registering and handling URLs in your app, refer to the Apple documentation:
+* [Implementing Custom URL Schemes](https://developer.apple.com/library/content/documentation/iPhone/Conceptual/iPhoneOSProgrammingGuide/Inter-AppCommunication/Inter-AppCommunication.html#//apple_ref/doc/uid/TP40007072-CH6-SW10)
+* [Supporting Universal Links](https://developer.apple.com/library/content/documentation/General/Conceptual/AppSearch/UniversalLinks.html)
+
+Then you'll need to set up your app delegate to forward URLs to the Stripe SDK.
+##### Swift
+```objc
+// This method handles opening native URLs (e.g., "yourexampleapp://")
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
+  BOOL stripeHandled = [Stripe handleStripeURLCallbackWithURL:url];
+  if (stripeHandled) {
+    return YES;
+  } else {
+    // This was not a stripe url – do whatever url handling your app
+    // normally does, if any.
+  }
+  return NO;
+}
+
+// This method handles opening univeral link URLs (e.g.,"https://example.com/stripe_ios_callback")
+- (BOOL)application:(UIApplication *)application continueUserActivity:(NSUserActivity *)userActivity restorationHandler:(void (^)(NSArray * _Nullable))restorationHandler {
+  if (userActivity.activityType == NSUserActivityTypeBrowsingWeb) {
+    if (userActivity.webpageURL) {
+      BOOL stripeHandled = [Stripe handleStripeURLCallbackWithURL:userActivity.webpageURL];
+      if (stripeHandled) {
+        return YES;
+      } else {
+        // This was not a stripe url – do whatever url handling your app
+        // normally does, if any.
+      }
+      return NO;
+    }
+  }
+}
+```
+##### Objective-c
+```swift
+// This method handles opening native URLs (e.g., "yourexampleapp://")
+func application(_ app: UIApplication, open url: URL, options: [UIApplicationOpenURLOptionsKey : Any] = [:]) -> Bool {
+  let stripeHandled = Stripe.handleURLCallback(with: url)
+  if (stripeHandled) {
+    return true
+  } else {
+    // This was not a stripe url – do whatever url handling your app
+    // normally does, if any.
+  }
+  return false
+}
+
+// This method handles opening univeral link URLs (e.g., "https://example.com/stripe_ios_callback")
+func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([Any]?) -> Void) -> Bool {
+  if userActivity.activityType == NSUserActivityTypeBrowsingWeb {
+    if let url = userActivity.webpageURL {
+      let stripeHandled = Stripe.handleURLCallback(with: url)
+      if (stripeHandled) {
+        return true
+      } else {
+        // This was not a stripe url – do whatever url handling your app
+        // normally does, if any.
+      }
+    }
+  }
+  return false
+}
+```
+
 ### Request with Card Form
 
 #### `paymentRequestWithCardForm(options) -> Promise`
@@ -697,6 +830,17 @@ To solve this problem please be sure that `Stripe.framework` is added to `Link B
 `NoClassDefFoundError: com.google.android.gms.wallet.MaskedWalletRequest`
 
 We have fixed this issue, but if you somehow facing this bug again - please, create an issue or a pull request and we will take another look.
+
+#### jest
+To make jest work with tipsi-stripe, you should change `transformIgnorePatterns` in `package.json` file. Please refer to [here](https://facebook.github.io/jest/docs/tutorial-react-native.html#transformignorepatterns-customization)
+```js
+"jest": {
+  "preset": "react-native",
+  "transformIgnorePatterns": [
+    "node_modules/(?!(jest-)?react-native|tipsi-stripe)"
+  ]
+}
+```
 
 ## Example
 

@@ -95,3 +95,14 @@ export const paymentRequestWithAndroidPayOptionsPropTypes = {
   total_price: PropTypes.string.isRequired,
   currency_code: PropTypes.string.isRequired,
 }
+
+export const createSourceWithBitcoinPropTypes = {
+  amount: PropTypes.number.isRequired,
+  email: PropTypes.string.isRequired,
+}
+
+export const createSourceWithAliPayPropTypes = {
+  amount: PropTypes.number.isRequired,
+  returnURL: PropTypes.string.isRequired,
+  currency: PropTypes.oneOf(['aud', 'cad', 'eur', 'gbp', 'hkd', 'jpy', 'nzd', 'sgd', 'usd']),
+}

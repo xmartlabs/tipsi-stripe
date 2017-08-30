@@ -240,7 +240,6 @@ RCT_EXPORT_METHOD(paymentRequestWithCardForm:(NSDictionary *)options
 
     NSUInteger requiredBillingAddressFields = [self billingType:options[@"requiredBillingAddressFields"]];
     NSString *companyName = options[@"companyName"] ? options[@"companyName"] : @"";
-    BOOL smsAutofillDisabled = [options[@"smsAutofillDisabled"] boolValue];
     STPUserInformation *prefilledInformation = [self userInformation:options[@"prefilledInformation"]];
     NSString *managedAccountCurrency = options[@"managedAccountCurrency"];
     NSString *nextPublishableKey = options[@"publishableKey"] ? options[@"publishableKey"] : publishableKey;
@@ -250,7 +249,6 @@ RCT_EXPORT_METHOD(paymentRequestWithCardForm:(NSDictionary *)options
     STPPaymentConfiguration *configuration = [[STPPaymentConfiguration alloc] init];
     [configuration setRequiredBillingAddressFields:requiredBillingAddressFields];
     [configuration setCompanyName:companyName];
-    [configuration setSmsAutofillDisabled:smsAutofillDisabled];
     [configuration setPublishableKey:nextPublishableKey];
 
 
@@ -343,6 +341,69 @@ RCT_EXPORT_METHOD(openApplePaySetup) {
     }
 }
 
+RCT_EXPORT_METHOD(createSourceWithBitcoin:(NSDictionary *)options
+                                 resolver:(RCTPromiseResolveBlock)resolve
+                                 rejecter:(RCTPromiseRejectBlock)reject) {
+    NSUInteger amount = [options[@"amount"] integerValue];
+    NSString *email = options[@"email"];
+    NSString *currency = @"USD";
+    
+    STPSourceParams *params = [STPSourceParams bitcoinParamsWithAmount:amount
+                                                              currency:currency
+                                                                 email:email];
+    [[STPAPIClient sharedClient] createSourceWithParams:params
+                                             completion:^(STPSource *source, NSError *error) {
+        if (error) {
+            reject(nil, nil, error);
+            return;
+        }
+        
+        resolve([self convertSourceObject:source]);
+    }];
+}
+
+RCT_EXPORT_METHOD(createSourceWithAliPay:(NSDictionary *)options
+                                resolver:(RCTPromiseResolveBlock)resolve
+                                rejecter:(RCTPromiseRejectBlock)reject) {
+    NSUInteger amount = [options[@"amount"] integerValue];
+    NSString *currency = options[@"currency"] ?: @"usd";
+    NSString *returnURL = options[@"returnURL"];
+    
+    STPSourceParams *params = [STPSourceParams alipayParamsWithAmount:amount
+                                                             currency:currency
+                                                            returnURL:returnURL];
+    [[STPAPIClient sharedClient] createSourceWithParams:params
+                                             completion:^(STPSource *source, NSError *error) {
+        if (error) {
+            reject(nil, nil, error);
+            return;
+        }
+        
+        if (source.flow == STPSourceFlowRedirect) {
+            STPRedirectContextCompletionBlock completionBlock = ^(NSString *sourceID, NSString *clientSecret, NSError *error) {
+                if (error) {
+                    reject(nil, nil, error);
+                    return;
+                }
+                
+                NSMutableDictionary *result = [NSMutableDictionary new];
+                [result setValue:sourceID forKey:@"sourceId"];
+                [result setValue:clientSecret forKey:@"clientSecret"];
+                
+                resolve(result);
+            };
+            
+            STPRedirectContext *redirectContext = [[STPRedirectContext alloc] initWithSource:source
+                                                                                  completion:completionBlock];
+            [redirectContext startSafariAppRedirectFlow];
+        } else {
+            NSDictionary *userInfo = @{NSLocalizedDescriptionKey: @"Unexpected source flow type, expected to be STPSourceFlowRedirect"};
+            NSError *error = [NSError errorWithDomain:StripeDomain code:STPInvalidRequestError userInfo:userInfo];
+            reject(nil, nil, error);
+        }
+     }];
+}
+
 #pragma mark STPAddCardViewControllerDelegate
 
 - (void)addCardViewController:(STPAddCardViewController *)controller
@@ -409,6 +470,236 @@ RCT_EXPORT_METHOD(openApplePaySetup) {
             @"User canceled Apple Pay",
             [[NSError alloc] initWithDomain:@"StripeNative" code:2 userInfo:@{NSLocalizedDescriptionKey:@"User canceled Apple Pay"}]
         );
+    }
+}
+
+- (NSDictionary *)convertAddressObject:(STPAddress *)address {
+    NSMutableDictionary *result = [NSMutableDictionary new];
+    
+    [result setValue:address.name forKey:@"name"];
+    [result setValue:address.line1 forKey:@"line1"];
+    [result setValue:address.line2 forKey:@"line2"];
+    [result setValue:address.city forKey:@"city"];
+    [result setValue:address.state forKey:@"state"];
+    [result setValue:address.postalCode forKey:@"postalCode"];
+    [result setValue:address.country forKey:@"country"];
+    [result setValue:address.phone forKey:@"phone"];
+    [result setValue:address.email forKey:@"email"];
+    
+    return result;
+}
+
+- (NSDictionary *)convertSourceObject:(STPSource *)source {
+    NSMutableDictionary *result = [NSMutableDictionary new];
+    
+    // Source
+    [result setValue:source.amount forKey:@"amount"];
+    [result setValue:source.created forKey:@"created"];
+    [result setValue:source.currency forKey:@"currency"];
+    [result setValue:source.metadata forKey:@"metadata"];
+    [result setValue:source.details forKey:@"details"];
+    [result setValue:@(source.livemode) forKey:@"livemode"];
+    [result setValue:[self sourceFlow:source.flow] forKey:@"flow"];
+    [result setValue:[self sourceStatus:source.status] forKey:@"status"];
+    [result setValue:[self sourceType:source.type] forKey:@"type"];
+    [result setValue:[self sourceUsage:source.usage] forKey:@"usage"];
+    
+    // Owner
+    if (source.owner) {
+        NSMutableDictionary *owner = [NSMutableDictionary new];
+        [result setValue:owner forKey:@"owner"];
+        
+        [owner setValue:source.owner.email forKey:@"email"];
+        [owner setValue:source.owner.name forKey:@"name"];
+        [owner setValue:source.owner.phone forKey:@"phone"];
+        [owner setValue:source.owner.verifiedEmail forKey:@"verifiedEmail"];
+        [owner setValue:source.owner.verifiedName forKey:@"verifiedName"];
+        [owner setValue:source.owner.verifiedPhone forKey:@"verifiedPhone"];
+        
+        // Address
+        if (source.owner.address) {
+            NSDictionary *address = [self convertAddressObject:source.owner.address];
+            [result setValue:address forKey:@"address"];
+        }
+        
+        // Verified address
+        if (source.owner.verifiedAddress) {
+            NSDictionary *address = [self convertAddressObject:source.owner.verifiedAddress];
+            [result setValue:address forKey:@"verifiedAddress"];
+        }
+    }
+    
+    // Receiver
+    if (source.receiver) {
+        NSMutableDictionary *receiver = [NSMutableDictionary new];
+        [result setValue:receiver forKey:@"receiver"];
+        
+        [receiver setValue:source.receiver.address forKey:@"address"];
+        [receiver setValue:source.receiver.amountCharged forKey:@"amountCharged"];
+        [receiver setValue:source.receiver.amountReceived forKey:@"amountReceived"];
+        [receiver setValue:source.receiver.amountReturned forKey:@"amountReturned"];
+    }
+    
+    // Redirect
+    if (source.redirect) {
+        NSMutableDictionary *redirect = [NSMutableDictionary new];
+        [result setValue:redirect forKey:@"redirect"];
+        
+        [redirect setValue:[source.redirect.returnURL absoluteString] forKey:@"returnURL"];
+        [redirect setValue:[source.redirect.url absoluteString] forKey:@"url"];
+        [redirect setValue:[self redirectStatus:source.redirect.status] forKey:@"status"];
+    }
+    
+    // Verification
+    if (source.verification) {
+        NSMutableDictionary *verification = [NSMutableDictionary new];
+        [result setValue:verification forKey:@"verification"];
+        
+        [verification setValue:source.verification.attemptsRemaining forKey:@"attemptsRemaining"];
+        [verification setValue:[self sourceVerificationStatus:source.verification.status] forKey:@"status"];
+    }
+    
+    // Card details
+    if (source.cardDetails) {
+        NSMutableDictionary *cardDetails = [NSMutableDictionary new];
+        [result setValue:cardDetails forKey:@"cardDetails"];
+        
+        [cardDetails setValue:source.cardDetails.last4 forKey:@"last4"];
+        [cardDetails setValue:@(source.cardDetails.expMonth) forKey:@"expMonth"];
+        [cardDetails setValue:@(source.cardDetails.expYear) forKey:@"expYear"];
+        [cardDetails setValue:source.cardDetails.country forKey:@"country"];
+        [cardDetails setValue:[self cardBrand:source.cardDetails.brand] forKey:@"brand"];
+        [cardDetails setValue:[self sourceCardDetail3DSecureStatus:source.cardDetails.threeDSecure] forKey:@"threeDSecure"];
+    }
+    
+    // SEPA debit details
+    if (source.sepaDebitDetails) {
+        NSMutableDictionary *sepaDebitDetails = [NSMutableDictionary new];
+        [result setValue:sepaDebitDetails forKey:@"sepaDebitDetails"];
+        
+        [sepaDebitDetails setValue:source.sepaDebitDetails.last4 forKey:@"last4"];
+        [sepaDebitDetails setValue:source.sepaDebitDetails.bankCode forKey:@"bankCode"];
+        [sepaDebitDetails setValue:source.sepaDebitDetails.country forKey:@"country"];
+        [sepaDebitDetails setValue:source.sepaDebitDetails.fingerprint forKey:@"fingerprint"];
+        [sepaDebitDetails setValue:source.sepaDebitDetails.mandateReference forKey:@"mandateReference"];
+        [sepaDebitDetails setValue:source.sepaDebitDetails.mandateURL forKey:@"mandateURL"];
+    }
+    
+    return result;
+}
+
+- (NSString *)sourceCardDetail3DSecureStatus:(STPSourceCard3DSecureStatus)status {
+    switch (status) {
+        case STPSourceCard3DSecureStatusRequired:
+            return @"required";
+        case STPSourceCard3DSecureStatusOptional:
+            return @"optional";
+        case STPSourceCard3DSecureStatusNotSupported:
+            return @"supported";
+        case STPSourceCard3DSecureStatusUnknown:
+            return @"unknown";
+    }
+}
+
+- (NSString *)sourceVerificationStatus:(STPSourceVerificationStatus)status {
+    switch (status) {
+        case STPSourceVerificationStatusPending:
+            return @"pending";
+        case STPSourceVerificationStatusSucceeded:
+            return @"succeeded";
+        case STPSourceVerificationStatusFailed:
+            return @"failed";
+        case STPSourceVerificationStatusUnknown:
+            return @"uknown";
+    }
+}
+
+- (NSString *)sourceUsage:(STPSourceUsage)usage {
+    switch (usage) {
+        case STPSourceUsageSingleUse:
+            return @"single";
+        case STPSourceUsageReusable:
+            return @"reusable";
+        case STPSourceUsageUnknown:
+            return @"uknown";
+    }
+}
+
+- (NSString *)sourceType:(STPSourceType)type {
+    switch (type) {
+        case STPSourceTypeBancontact:
+            return @"bancontact";
+        case STPSourceTypeBitcoin:
+            return @"bitcoin";
+        case STPSourceTypeCard:
+            return @"card";
+        case STPSourceTypeGiropay:
+            return @"giropay";
+        case STPSourceTypeIDEAL:
+            return @"ideal";
+        case STPSourceTypeSEPADebit:
+            return @"sepadebit";
+        case STPSourceTypeSofort:
+            return @"sofort";
+        case STPSourceTypeThreeDSecure:
+            return @"3dsecure";
+        case STPSourceTypeAlipay:
+            return @"alipay";
+        case STPSourceTypeUnknown:
+            return @"unknown";
+        default:
+            break;
+    }
+}
+
+- (NSString *)redirectStatus:(STPSourceRedirectStatus)status {
+    switch (status) {
+        case STPSourceRedirectStatusSucceeded:
+            return @"success";
+        case STPSourceRedirectStatusPending:
+            return @"pending";
+        case STPSourceRedirectStatusFailed:
+            return @"failed";
+        case STPSourceRedirectStatusUnknown:
+            return @"unknown";
+        default:
+            break;
+    }
+}
+
+- (NSString *)sourceStatus:(STPSourceStatus)status {
+    switch (status) {
+        case STPSourceStatusPending:
+            return @"pending";
+        case STPSourceStatusChargeable:
+            return @"chargeable";
+        case STPSourceStatusConsumed:
+            return @"consumed";
+        case STPSourceStatusCanceled:
+            return @"canceled";
+        case STPSourceStatusFailed:
+            return @"failed";
+        case STPSourceStatusUnknown:
+            return @"unknown";
+        default:
+            break;
+    }
+}
+
+- (NSString *)sourceFlow:(STPSourceFlow)flow {
+    switch (flow) {
+        case STPSourceFlowNone:
+            return @"none";
+        case STPSourceFlowReceiver:
+            return @"receiver";
+        case STPSourceFlowRedirect:
+            return @"redirect";
+        case STPSourceFlowCodeVerification:
+            return @"codeVerification";
+        case STPSourceFlowUnknown:
+            return @"unknown";
+        default:
+            break;
     }
 }
 
@@ -607,8 +898,6 @@ RCT_EXPORT_METHOD(openApplePaySetup) {
 - (STPUserInformation *)userInformation:(NSDictionary*)inputInformation {
     STPUserInformation *userInformation = [[STPUserInformation alloc] init];
 
-    [userInformation setEmail:inputInformation[@"email"]];
-    [userInformation setPhone:inputInformation[@"phone"]];
     [userInformation setBillingAddress: [self address:inputInformation[@"billingAddress"]]];
 
     return userInformation;
