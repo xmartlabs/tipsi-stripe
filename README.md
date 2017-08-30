@@ -464,7 +464,7 @@ For this return URL, you can either use a custom URL scheme or a universal link 
 * [Supporting Universal Links](https://developer.apple.com/library/content/documentation/General/Conceptual/AppSearch/UniversalLinks.html)
 
 Then you'll need to set up your app delegate to forward URLs to the Stripe SDK.
-##### Swift
+##### Objective-c
 ```objc
 // This method handles opening native URLs (e.g., "yourexampleapp://")
 - (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
@@ -494,7 +494,7 @@ Then you'll need to set up your app delegate to forward URLs to the Stripe SDK.
   }
 }
 ```
-##### Objective-c
+##### Swift
 ```swift
 // This method handles opening native URLs (e.g., "yourexampleapp://")
 func application(_ app: UIApplication, open url: URL, options: [UIApplicationOpenURLOptionsKey : Any] = [:]) -> Bool {
