@@ -464,6 +464,7 @@ For this return URL, you can either use a custom URL scheme or a universal link 
 * [Supporting Universal Links](https://developer.apple.com/library/content/documentation/General/Conceptual/AppSearch/UniversalLinks.html)
 
 Then you'll need to set up your app delegate to forward URLs to the Stripe SDK.
+
 ##### Objective-c
 ```objc
 // This method handles opening native URLs (e.g., "yourexampleapp://")
@@ -522,6 +523,57 @@ func application(_ application: UIApplication, continue userActivity: NSUserActi
     }
   }
   return false
+}
+```
+
+#### Android
+
+When declaring your activity that creates redirect-based sources, list an intent-filter item in your AndroidManifest.xml file. This allows you to accept links into your application. Your activity must include android:launchMode="singleTask" or else a new copy of it is opened when your customer comes back from the browser.
+
+```xml
+<activity
+    android:name=".activity.PollingActivity"
+    android:launchMode="singleTask"
+    android:theme="@style/SampleTheme">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data
+            android:host="yourcompany"
+            android:scheme="yourpath"/>
+    </intent-filter>
+</activity>
+```
+
+To receive information from this event, listen for your activity getting started back up with a new Intent using the onNewIntent lifecycle method.
+
+```java
+@Override
+protected void onNewIntent(Intent intent) {
+    super.onNewIntent(intent);
+    if (intent.getData() != null && intent.getData().getQuery() != null) {
+        // The client secret and source ID found here is identical to
+        // that of the source used to get the redirect URL.
+
+        String host = intent.getData().getHost();
+        // Note: you don't have to get the client secret
+        // and source ID here. They are the same as the
+        // values already in your source.
+        String clientSecret = intent.getData().getQueryParameter(QUERY_CLIENT_SECRET);
+        String sourceId = intent.getData().getQueryParameter(QUERY_SOURCE_ID);
+        if (clientSecret != null
+                && sourceId != null
+                && clientSecret.equals(mRedirectSource.getClientSecret())
+                && sourceId.equals(mRedirectSource.getId())) {
+            // Then this is a redirect back for the original source.
+            // You should poll your own backend to update based on
+            // source status change webhook events it may receive, and display the results
+            // of that here.
+        }
+        // If you had a dialog open when your user went elsewhere, remember to close it here.
+        mRedirectDialogController.dismissDialog();
+    }
 }
 ```
 
