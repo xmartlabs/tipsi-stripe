@@ -512,25 +512,25 @@ public class StripeModule extends ReactContextBaseJavaModule {
 
     newSource.putString("sourceId", source.getId());
     newSource.putInt("amount", source.getAmount().intValue());
-    newSource.putString("currency", source.getCurrency());
     newSource.putInt("created", source.getCreated().intValue());
+    newSource.putString("currency", source.getCurrency());
     newSource.putString("flow", source.getFlow());
+    newSource.putBoolean("livemode", source.isLiveMode());
+    newSource.putMap("metadata", stringMapToWritableMap(source.getMetaData()));
+    newSource.putMap("owner", convertOwnerToWritableMap(source.getOwner()));
+    newSource.putMap("receiver", convertReceiverToWritableMap(source.getReceiver()));
+    newSource.putMap("redirect", convertRedirectToWritableMap(source.getRedirect()));
     newSource.putString("status", source.getStatus());
     newSource.putString("type", source.getType());
     newSource.putString("typeRaw", source.getTypeRaw());
     newSource.putString("usage", source.getUsage());
 
-    newSource.putMap("metadata", stringMapToWritableMap(source.getMetaData()));
-
     // TODO: source.getCodeVerification(), it doesn't have public properties to get data.
+    // Waiting for PR https://github.com/stripe/stripe-android/pull/366 to be merged
     // newSource.putMap("codeVerification", source.getCodeVerification());
 
     // TODO: source.getSourceTypeData(), it is a Map<String, Object> cannot be easily mapped to WritableMap
     // newSource.putMap("sourceTypeData", source.getSourceTypeData());
-
-    newSource.putMap("owner", convertOwnerToWritableMap(source.getOwner()));
-    newSource.putMap("receiver", convertReceiverToWritableMap(source.getReceiver()));
-    newSource.putMap("redirect", convertRedirectToWritableMap(source.getRedirect()));
 
     return newSource;
   }
