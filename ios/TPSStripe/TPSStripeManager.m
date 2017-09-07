@@ -493,6 +493,7 @@ RCT_EXPORT_METHOD(createSourceWithAliPay:(NSDictionary *)options
     NSMutableDictionary *result = [NSMutableDictionary new];
     
     // Source
+    [result setValue:source.stripeID forKey:@"sourceId"];
     [result setValue:source.amount forKey:@"amount"];
     [result setValue:source.created forKey:@"created"];
     [result setValue:source.currency forKey:@"currency"];
