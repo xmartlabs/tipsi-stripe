@@ -12,6 +12,8 @@
 #import <React/RCTBundleURLProvider.h>
 #import <React/RCTRootView.h>
 
+#import <Stripe/Stripe.h>
+
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
@@ -32,6 +34,22 @@
   self.window.rootViewController = rootViewController;
   [self.window makeKeyAndVisible];
   return YES;
+}
+
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey, id> *)options {
+  BOOL stripeHandled = [Stripe handleStripeURLCallbackWithURL:url];
+  return stripeHandled;
+}
+
+- (BOOL)application:(UIApplication *)application continueUserActivity:(NSUserActivity *)userActivity restorationHandler:(void (^)(NSArray * _Nullable))restorationHandler {
+  if (userActivity.activityType == NSUserActivityTypeBrowsingWeb) {
+    if (userActivity.webpageURL) {
+      BOOL stripeHandled = [Stripe handleStripeURLCallbackWithURL:userActivity.webpageURL];
+      return stripeHandled;
+    }
+  }
+  
+  return NO;
 }
 
 @end

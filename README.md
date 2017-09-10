@@ -392,6 +392,191 @@ const token = await stripe.paymentRequestWithAndroidPay(options)
 // api.sendTokenToBackend(token)
 ```
 
+### Other sources (https://stripe.com/docs/sources)
+
+Currently only `Bitcoin` and `Alipay` are supported by `Tipsy-Stripe`.
+
+#### Bitcoin
+
+#### `createSourceWithBitcoin(options) -> Promise`
+
+Create a source to pay with `Bitcoin`. Returns a [`source`](https://stripe.com/docs/api#source_object) object.
+
+##### `options`
+An object with the following keys:
+
+* `amount` _Integer_ - A positive integer in the smallest currency unit representing the amount to charge the customer (e.g., 1099 for a $10.99 payment).
+* `email` _String_ - The full email address of the customer.
+
+#### Example
+
+```js
+const options = {
+  amount: '8000',
+  email: 'youremail@test.com',
+}
+
+const source = await stripe.createSourceWithBitcoin(options)
+
+// Client specific code
+// Send source to backend and wait for it to be chargeable to create charge
+// api.sendSourceToBackend(source)
+```
+
+#### AliPay
+
+#### `createSourceWithAliPay(options) -> Promise`
+
+Create a source to pay with `AliPay`. After the customer returns to the app, returns an object with the following data:
+* `sourceId` _String_ - A string representing the original ID of the `Source` object.
+* `clientSecret` _String_ - Used to confirm that the returning customer is the same one who triggered the creation of the source (source IDs are not considered secret)
+
+##### `options`
+An object with the following keys:
+
+* `amount` _Integer_ - A positive integer in the smallest currency unit representing the amount to charge the customer (e.g., 1099 for a $10.99 payment).
+* `currency` _String_ - The currency of the payment. Can be aud, cad, eur, gbp, hkd, jpy, nzd, sgd, or usd, defaults to usd.
+* `returnURL` _String_ - The URL the customer should be redirected to after the authorization process.
+
+#### Example
+
+```js
+const options = {
+  amount: '8000',
+  currency: 'usd',
+  returnURL: 'yourexampleapp://',
+}
+
+const result = await stripe.createSourceWithAliPay(options)
+
+// Client specific code
+// Send sourceId to backend to create charge
+// api.sendSourceToBackend(result.sourceId)
+```
+
+#### Redirecting your customer to authorize a source
+
+For sources that require redirecting your customer to authorize the payment, you need to specify a return URL when you create the source. This allows your customer to be redirected back to your app after they authorize the payment.
+
+#### iOS
+For this return URL, you can either use a custom URL scheme or a universal link supported by your app. For more information on registering and handling URLs in your app, refer to the Apple documentation:
+* [Implementing Custom URL Schemes](https://developer.apple.com/library/content/documentation/iPhone/Conceptual/iPhoneOSProgrammingGuide/Inter-AppCommunication/Inter-AppCommunication.html#//apple_ref/doc/uid/TP40007072-CH6-SW10)
+* [Supporting Universal Links](https://developer.apple.com/library/content/documentation/General/Conceptual/AppSearch/UniversalLinks.html)
+
+Then you'll need to set up your app delegate to forward URLs to the Stripe SDK.
+
+##### Objective-c
+```objc
+// This method handles opening native URLs (e.g., "yourexampleapp://")
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
+  BOOL stripeHandled = [Stripe handleStripeURLCallbackWithURL:url];
+  if (stripeHandled) {
+    return YES;
+  } else {
+    // This was not a stripe url – do whatever url handling your app
+    // normally does, if any.
+  }
+  return NO;
+}
+
+// This method handles opening univeral link URLs (e.g.,"https://example.com/stripe_ios_callback")
+- (BOOL)application:(UIApplication *)application continueUserActivity:(NSUserActivity *)userActivity restorationHandler:(void (^)(NSArray * _Nullable))restorationHandler {
+  if (userActivity.activityType == NSUserActivityTypeBrowsingWeb) {
+    if (userActivity.webpageURL) {
+      BOOL stripeHandled = [Stripe handleStripeURLCallbackWithURL:userActivity.webpageURL];
+      if (stripeHandled) {
+        return YES;
+      } else {
+        // This was not a stripe url – do whatever url handling your app
+        // normally does, if any.
+      }
+      return NO;
+    }
+  }
+}
+```
+##### Swift
+```swift
+// This method handles opening native URLs (e.g., "yourexampleapp://")
+func application(_ app: UIApplication, open url: URL, options: [UIApplicationOpenURLOptionsKey : Any] = [:]) -> Bool {
+  let stripeHandled = Stripe.handleURLCallback(with: url)
+  if (stripeHandled) {
+    return true
+  } else {
+    // This was not a stripe url – do whatever url handling your app
+    // normally does, if any.
+  }
+  return false
+}
+
+// This method handles opening univeral link URLs (e.g., "https://example.com/stripe_ios_callback")
+func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([Any]?) -> Void) -> Bool {
+  if userActivity.activityType == NSUserActivityTypeBrowsingWeb {
+    if let url = userActivity.webpageURL {
+      let stripeHandled = Stripe.handleURLCallback(with: url)
+      if (stripeHandled) {
+        return true
+      } else {
+        // This was not a stripe url – do whatever url handling your app
+        // normally does, if any.
+      }
+    }
+  }
+  return false
+}
+```
+
+#### Android
+
+When declaring your activity that creates redirect-based sources, list an intent-filter item in your AndroidManifest.xml file. This allows you to accept links into your application. Your activity must include android:launchMode="singleTask" or else a new copy of it is opened when your customer comes back from the browser.
+
+```xml
+<activity
+    android:name=".activity.PollingActivity"
+    android:launchMode="singleTask"
+    android:theme="@style/SampleTheme">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data
+            android:host="yourcompany"
+            android:scheme="yourpath"/>
+    </intent-filter>
+</activity>
+```
+
+To receive information from this event, listen for your activity getting started back up with a new Intent using the onNewIntent lifecycle method.
+
+```java
+@Override
+protected void onNewIntent(Intent intent) {
+    super.onNewIntent(intent);
+    if (intent.getData() != null && intent.getData().getQuery() != null) {
+        // The client secret and source ID found here is identical to
+        // that of the source used to get the redirect URL.
+
+        String host = intent.getData().getHost();
+        // Note: you don't have to get the client secret
+        // and source ID here. They are the same as the
+        // values already in your source.
+        String clientSecret = intent.getData().getQueryParameter(QUERY_CLIENT_SECRET);
+        String sourceId = intent.getData().getQueryParameter(QUERY_SOURCE_ID);
+        if (clientSecret != null
+                && sourceId != null
+                && clientSecret.equals(mRedirectSource.getClientSecret())
+                && sourceId.equals(mRedirectSource.getId())) {
+            // Then this is a redirect back for the original source.
+            // You should poll your own backend to update based on
+            // source status change webhook events it may receive, and display the results
+            // of that here.
+        }
+        // If you had a dialog open when your user went elsewhere, remember to close it here.
+        mRedirectDialogController.dismissDialog();
+    }
+}
+```
+
 ### Request with Card Form
 
 #### `paymentRequestWithCardForm(options) -> Promise`
